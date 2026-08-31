@@ -10,6 +10,9 @@ const ALLOWED = [
   'biurodariabarbara@gmail.com',
 ];
 
+const MAX_FILES = 3;
+const MAX_FILE_MB = 2;
+
 export default function Page() {
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
@@ -21,8 +24,11 @@ export default function Page() {
   const [showForm, setShowForm] = useState(false);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [files, setFiles] = useState([]);
 
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
 
   async function api(action, extra = {}, auth = me) {
     const credentials = auth || {
@@ -81,10 +87,13 @@ export default function Page() {
   async function login() {
     setError('');
 
-    const normalizedEmail = email.toLowerCase().trim();
+    const normalizedEmail =
+      email.toLowerCase().trim();
 
     if (!ALLOWED.includes(normalizedEmail)) {
-      setError('Ten adres e-mail nie ma dostępu.');
+      setError(
+        'Ten adres e-mail nie ma dostępu.'
+      );
       return;
     }
 
@@ -94,7 +103,11 @@ export default function Page() {
     };
 
     try {
-      const data = await api('list', {}, auth);
+      const data = await api(
+        'list',
+        {},
+        auth
+      );
 
       localStorage.setItem(
         'office_auth',
@@ -108,30 +121,106 @@ export default function Page() {
     }
   }
 
+  function fileToDataUrl(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+
+      reader.onload = () =>
+        resolve(reader.result);
+
+      reader.onerror = reject;
+
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function chooseFiles(e) {
+    setError('');
+
+    const picked = Array.from(
+      e.target.files || []
+    ).slice(0, MAX_FILES);
+
+    const tooBig = picked.find(
+      (file) =>
+        file.size >
+        MAX_FILE_MB * 1024 * 1024
+    );
+
+    if (tooBig) {
+      setError(
+        `Każde zdjęcie może mieć maksymalnie ${MAX_FILE_MB} MB.`
+      );
+      e.target.value = '';
+      return;
+    }
+
+    setFiles(picked);
+  }
+
   async function addTask() {
     if (!title.trim()) {
       setError('Wpisz tytuł zadania.');
       return;
     }
 
+    setSaving(true);
+    setError('');
+    setMessage('');
+
     try {
-      await api('create', {
-        title: title.trim(),
-        description: description.trim(),
-      });
+      const preparedFiles = [];
+
+      for (const file of files) {
+        const data =
+          await fileToDataUrl(file);
+
+        preparedFiles.push({
+          name: file.name,
+          type:
+            file.type ||
+            'image/jpeg',
+          data,
+        });
+      }
+
+      const data = await api(
+        'create',
+        {
+          title: title.trim(),
+          description:
+            description.trim(),
+          files: preparedFiles,
+        }
+      );
 
       setTitle('');
       setDescription('');
+      setFiles([]);
       setShowForm(false);
-      setError('');
+
+      if (data.email_sent) {
+        setMessage(
+          'Zadanie dodane. Mail do biura został wysłany.'
+        );
+      } else {
+        setMessage(
+          'Zadanie dodane. Mail nie został wysłany — sprawdzimy Resend.'
+        );
+      }
 
       await loadTasks();
     } catch (e) {
       setError(e.message);
+    } finally {
+      setSaving(false);
     }
   }
 
-  async function changeStatus(id, status) {
+  async function changeStatus(
+    id,
+    status
+  ) {
     let note = null;
 
     if (status === 'done') {
@@ -157,7 +246,10 @@ export default function Page() {
   }
 
   function logout() {
-    localStorage.removeItem('office_auth');
+    localStorage.removeItem(
+      'office_auth'
+    );
+
     setMe(null);
     setTasks([]);
     setEmail('');
@@ -168,19 +260,24 @@ export default function Page() {
     return (
       <main className="w">
         <div className="card login">
-          <div className="ey">DARIA BARBARA</div>
+          <div className="ey">
+            DARIA BARBARA
+          </div>
 
           <h1>Zadania biura</h1>
 
           <p className="mut">
-            Zaloguj się adresem e-mail i kodem dostępu.
+            Zaloguj się adresem e-mail i
+            kodem dostępu.
           </p>
 
           <input
             type="email"
             placeholder="adres e-mail"
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={(e) =>
+              setEmail(e.target.value)
+            }
           />
 
           <input
@@ -188,7 +285,9 @@ export default function Page() {
             inputMode="numeric"
             placeholder="kod dostępu"
             value={code}
-            onChange={(e) => setCode(e.target.value)}
+            onChange={(e) =>
+              setCode(e.target.value)
+            }
           />
 
           <button
@@ -222,7 +321,8 @@ export default function Page() {
     filter === 'all'
       ? tasks
       : tasks.filter(
-          (task) => task.status === filter
+          (task) =>
+            task.status === filter
         );
 
   return (
@@ -268,6 +368,12 @@ export default function Page() {
         </div>
       )}
 
+      {message && (
+        <div className="note">
+          {message}
+        </div>
+      )}
+
       {showForm && (
         <div className="form">
           <input
@@ -282,43 +388,114 @@ export default function Page() {
             placeholder="Opis / szczegóły"
             value={description}
             onChange={(e) =>
-              setDescription(e.target.value)
+              setDescription(
+                e.target.value
+              )
             }
           />
 
-          <button onClick={addTask}>
-            Dodaj zadanie
+          <div
+            style={{
+              margin: '10px 0 14px',
+            }}
+          >
+            <label
+              className="lite"
+              style={{
+                display:
+                  'inline-block',
+                padding:
+                  '11px 16px',
+                borderRadius: 999,
+                cursor: 'pointer',
+                fontWeight: 650,
+              }}
+            >
+              📷 Dodaj zdjęcia
+
+              <input
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={
+                  chooseFiles
+                }
+                style={{
+                  display: 'none',
+                }}
+              />
+            </label>
+
+            <span
+              className="mut"
+              style={{
+                marginLeft: 10,
+              }}
+            >
+              max {MAX_FILES} zdjęcia,{' '}
+              {MAX_FILE_MB} MB każde
+            </span>
+          </div>
+
+          {files.length > 0 && (
+            <div
+              className="mut"
+              style={{
+                marginBottom: 12,
+              }}
+            >
+              {files.map((file) => (
+                <div key={file.name}>
+                  • {file.name}
+                </div>
+              ))}
+            </div>
+          )}
+
+          <button
+            onClick={addTask}
+            disabled={saving}
+          >
+            {saving
+              ? 'Dodaję…'
+              : 'Dodaj zadanie'}
           </button>
         </div>
       )}
 
       <div className="tabs">
-        {tabs.map(([key, label]) => {
-          const count =
-            key === 'all'
-              ? tasks.length
-              : tasks.filter(
-                  (task) =>
-                    task.status === key
-                ).length;
+        {tabs.map(
+          ([key, label]) => {
+            const count =
+              key === 'all'
+                ? tasks.length
+                : tasks.filter(
+                    (task) =>
+                      task.status ===
+                      key
+                  ).length;
 
-          return (
-            <button
-              key={key}
-              className={
-                filter === key ? 'on' : ''
-              }
-              onClick={() =>
-                setFilter(key)
-              }
-            >
-              {label} {count}
-            </button>
-          );
-        })}
+            return (
+              <button
+                key={key}
+                className={
+                  filter === key
+                    ? 'on'
+                    : ''
+                }
+                onClick={() =>
+                  setFilter(key)
+                }
+              >
+                {label} {count}
+              </button>
+            );
+          }
+        )}
       </div>
 
-      {filteredTasks.length === 0 && (
+      {filteredTasks.length ===
+        0 && (
         <div
           className="mut"
           style={{
@@ -330,101 +507,164 @@ export default function Page() {
         </div>
       )}
 
-      {filteredTasks.map((task) => (
-        <div
-          className="card"
-          key={task.id}
-        >
-          <div className="bot">
-            <span
-              className={
-                'st ' +
-                (task.status === 'done'
-                  ? 'done'
+      {filteredTasks.map(
+        (task) => (
+          <div
+            className="card"
+            key={task.id}
+          >
+            <div className="bot">
+              <span
+                className={
+                  'st ' +
+                  (task.status ===
+                  'done'
+                    ? 'done'
+                    : task.status ===
+                      'in_progress'
+                    ? 'prog'
+                    : '')
+                }
+              >
+                {task.status ===
+                'todo'
+                  ? 'Do zrobienia'
                   : task.status ===
                     'in_progress'
-                  ? 'prog'
-                  : '')
-              }
-            >
-              {task.status === 'todo'
-                ? 'Do zrobienia'
-                : task.status ===
-                  'in_progress'
-                ? 'W trakcie'
-                : 'Zrobione'}
-            </span>
+                  ? 'W trakcie'
+                  : 'Zrobione'}
+              </span>
 
-            <span className="mut">
-              {new Date(
-                task.created_at
-              ).toLocaleString('pl-PL')}
-            </span>
-          </div>
-
-          <h2>{task.title}</h2>
-
-          {task.description && (
-            <p>{task.description}</p>
-          )}
-
-          {task.completion_note && (
-            <div className="note">
-              <b>Uwagi:</b>{' '}
-              {task.completion_note}
+              <span className="mut">
+                {new Date(
+                  task.created_at
+                ).toLocaleString(
+                  'pl-PL'
+                )}
+              </span>
             </div>
-          )}
 
-          <div className="bot">
-            <span className="mut">
-              {task.assigned_to_email ||
-                'Biuro'}
-            </span>
+            <h2>{task.title}</h2>
 
-            <div className="row">
-              {task.status === 'todo' && (
-                <button
-                  onClick={() =>
-                    changeStatus(
-                      task.id,
-                      'in_progress'
-                    )
-                  }
+            {task.description && (
+              <p>
+                {task.description}
+              </p>
+            )}
+
+            {Array.isArray(
+              task.attachments
+            ) &&
+              task.attachments
+                .length > 0 && (
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns:
+                      'repeat(auto-fill,minmax(120px,1fr))',
+                    gap: 10,
+                    margin: '14px 0',
+                  }}
                 >
-                  Rozpocznij
-                </button>
+                  {task.attachments.map(
+                    (attachment, i) =>
+                      attachment.url ? (
+                        <a
+                          href={
+                            attachment.url
+                          }
+                          target="_blank"
+                          rel="noreferrer"
+                          key={
+                            attachment.path ||
+                            i
+                          }
+                        >
+                          <img
+                            src={
+                              attachment.url
+                            }
+                            alt={
+                              attachment.name ||
+                              'Załącznik'
+                            }
+                            style={{
+                              width:
+                                '100%',
+                              height: 120,
+                              objectFit:
+                                'cover',
+                              borderRadius: 12,
+                              border:
+                                '1px solid #e4ded5',
+                            }}
+                          />
+                        </a>
+                      ) : null
+                  )}
+                </div>
               )}
 
-              {task.status !== 'done' ? (
-                <button
-                  onClick={() =>
-                    changeStatus(
-                      task.id,
-                      'done'
-                    )
-                  }
-                >
-                  ✓ Zrobione
-                </button>
-              ) : (
-                <button
-                  className="lite"
-                  onClick={() =>
-                    changeStatus(
-                      task.id,
-                      'todo'
-                    )
-                  }
-                >
-                  Przywróć
-                </button>
-              )}
+            {task.completion_note && (
+              <div className="note">
+                <b>Uwagi:</b>{' '}
+                {
+                  task.completion_note
+                }
+              </div>
+            )}
+
+            <div className="bot">
+              <span className="mut">
+                {task.assigned_to_email ||
+                  'Biuro'}
+              </span>
+
+              <div className="row">
+                {task.status ===
+                  'todo' && (
+                  <button
+                    onClick={() =>
+                      changeStatus(
+                        task.id,
+                        'in_progress'
+                      )
+                    }
+                  >
+                    Rozpocznij
+                  </button>
+                )}
+
+                {task.status !==
+                'done' ? (
+                  <button
+                    onClick={() =>
+                      changeStatus(
+                        task.id,
+                        'done'
+                      )
+                    }
+                  >
+                    ✓ Zrobione
+                  </button>
+                ) : (
+                  <button
+                    className="lite"
+                    onClick={() =>
+                      changeStatus(
+                        task.id,
+                        'todo'
+                      )
+                    }
+                  >
+                    Przywróć
+                  </button>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      ))}
+        )
+      )}
     </main>
   );
 }
-
-
