@@ -1,0 +1,159 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: #f6f4ef;
+  color: #191714;
+  font-family: Arial, sans-serif;
+}
+
+.w {
+  max-width: 900px;
+  margin: auto;
+  padding: 24px 16px;
+}
+
+.card,
+.form {
+  background: white;
+  border: 1px solid #e4ded5;
+  border-radius: 20px;
+  padding: 18px;
+  margin-bottom: 12px;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+button {
+  border: 0;
+  border-radius: 999px;
+  padding: 11px 16px;
+  background: #181818;
+  color: white;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.lite {
+  background: #ebe6dd;
+  color: #333;
+}
+
+.top,
+.row,
+.bot {
+  display: flex;
+  gap: 9px;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.ey {
+  font-size: 12px;
+  letter-spacing: .2em;
+  color: #777;
+}
+
+h1 {
+  font: 500 38px Georgia, serif;
+  margin: 7px 0;
+}
+
+.mut {
+  color: #7c756c;
+  font-size: 13px;
+}
+
+.tabs {
+  display: flex;
+  gap: 7px;
+  overflow: auto;
+  margin: 22px 0 14px;
+}
+
+.tabs button {
+  background: #e9e5dd;
+  color: #5b554d;
+  white-space: nowrap;
+}
+
+.tabs .on {
+  background: #181818;
+  color: white;
+}
+
+.st {
+  font-size: 12px;
+  padding: 6px 10px;
+  border-radius: 99px;
+  background: #eee9e1;
+}
+
+.done {
+  background: #e4f1e7;
+  color: #396244;
+}
+
+.prog {
+  background: #e6edf8;
+  color: #3e5b82;
+}
+
+.note {
+  background: #f6f3ee;
+  padding: 10px;
+  border-radius: 12px;
+  margin: 12px 0;
+}
+
+.form input,
+.form textarea,
+.login input {
+  width: 100%;
+  padding: 13px;
+  border: 1px solid #d8d2c9;
+  border-radius: 13px;
+  margin: 5px 0;
+}
+
+.form textarea {
+  min-height: 95px;
+}
+
+.login {
+  max-width: 430px;
+  margin: 70px auto;
+}
+
+.err {
+  background: #f7e8e8;
+  color: #8a3535;
+  padding: 12px 14px;
+  border-radius: 12px;
+  margin: 10px 0;
+}
+
+@media (max-width: 600px) {
+  h1 {
+    font-size: 32px;
+  }
+
+  .top {
+    align-items: flex-start;
+  }
+
+  .top .row {
+    width: 100%;
+  }
+
+  .top .row button {
+    flex: 1;
+  }
+}
