@@ -5,13 +5,19 @@ import { useEffect, useState } from 'react';
 const API =
   'https://nhielwcjvbmtwnsrmeog.supabase.co/functions/v1/office-api';
 
-const ALLOWED = [
-  'dariabarbarabartos@gmail.com',
-  'biurodariabarbara@gmail.com',
-];
+const BOSS = 'dariabarbarabartos@gmail.com';
+const OFFICE = 'biurodariabarbara@gmail.com';
+
+const ALLOWED = [BOSS, OFFICE];
 
 const MAX_FILES = 3;
-const MAX_FILE_MB = 2;
+const MAX_FILE_MB = 5;
+
+function personLabel(email) {
+  return email === BOSS
+    ? 'Daria · Szefowa'
+    : 'Biuro';
+}
 
 export default function Page() {
   const [email, setEmail] = useState('');
@@ -21,26 +27,46 @@ export default function Page() {
   const [tasks, setTasks] = useState([]);
   const [filter, setFilter] = useState('all');
 
-  const [showForm, setShowForm] = useState(false);
+  const [showForm, setShowForm] =
+    useState(false);
+
   const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
+  const [description, setDescription] =
+    useState('');
+
   const [files, setFiles] = useState([]);
 
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
-  const [message, setMessage] = useState('');
+  const [assignee, setAssignee] =
+    useState(OFFICE);
 
-  async function api(action, extra = {}, auth = me) {
-    const credentials = auth || {
-      email: email.toLowerCase().trim(),
-      code,
-    };
+  const [saving, setSaving] =
+    useState(false);
+
+  const [error, setError] = useState('');
+  const [message, setMessage] =
+    useState('');
+
+  async function api(
+    action,
+    extra = {},
+    auth = me
+  ) {
+    const credentials =
+      auth || {
+        email: email
+          .toLowerCase()
+          .trim(),
+        code,
+      };
 
     const response = await fetch(API, {
       method: 'POST',
+
       headers: {
-        'Content-Type': 'application/json',
+        'Content-Type':
+          'application/json',
       },
+
       body: JSON.stringify({
         action,
         email: credentials.email,
@@ -49,7 +75,8 @@ export default function Page() {
       }),
     });
 
-    const data = await response.json();
+    const data =
+      await response.json();
 
     if (!response.ok) {
       throw new Error(
@@ -62,10 +89,19 @@ export default function Page() {
     return data;
   }
 
-  async function loadTasks(auth = me) {
+  async function loadTasks(
+    auth = me
+  ) {
     try {
-      const data = await api('list', {}, auth);
-      setTasks(data.tasks || []);
+      const data = await api(
+        'list',
+        {},
+        auth
+      );
+
+      setTasks(
+        data.tasks || []
+      );
     } catch (e) {
       setError(e.message);
     }
@@ -73,12 +109,25 @@ export default function Page() {
 
   useEffect(() => {
     try {
-      const saved = JSON.parse(
-        localStorage.getItem('office_auth')
-      );
+      const saved =
+        JSON.parse(
+          localStorage.getItem(
+            'office_auth'
+          )
+        );
 
-      if (saved?.email && saved?.code) {
+      if (
+        saved?.email &&
+        saved?.code
+      ) {
         setMe(saved);
+
+        setAssignee(
+          saved.email === OFFICE
+            ? OFFICE
+            : OFFICE
+        );
+
         loadTasks(saved);
       }
     } catch {}
@@ -88,12 +137,19 @@ export default function Page() {
     setError('');
 
     const normalizedEmail =
-      email.toLowerCase().trim();
+      email
+        .toLowerCase()
+        .trim();
 
-    if (!ALLOWED.includes(normalizedEmail)) {
+    if (
+      !ALLOWED.includes(
+        normalizedEmail
+      )
+    ) {
       setError(
         'Ten adres e-mail nie ma dostępu.'
       );
+
       return;
     }
 
@@ -115,43 +171,66 @@ export default function Page() {
       );
 
       setMe(auth);
-      setTasks(data.tasks || []);
+
+      setAssignee(
+        normalizedEmail === OFFICE
+          ? OFFICE
+          : OFFICE
+      );
+
+      setTasks(
+        data.tasks || []
+      );
     } catch (e) {
       setError(e.message);
     }
   }
 
   function fileToDataUrl(file) {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
+    return new Promise(
+      (resolve, reject) => {
+        const reader =
+          new FileReader();
 
-      reader.onload = () =>
-        resolve(reader.result);
+        reader.onload = () =>
+          resolve(
+            reader.result
+          );
 
-      reader.onerror = reject;
+        reader.onerror =
+          reject;
 
-      reader.readAsDataURL(file);
-    });
+        reader.readAsDataURL(
+          file
+        );
+      }
+    );
   }
 
   function chooseFiles(e) {
     setError('');
 
-    const picked = Array.from(
-      e.target.files || []
-    ).slice(0, MAX_FILES);
+    const picked =
+      Array.from(
+        e.target.files || []
+      ).slice(0, MAX_FILES);
 
-    const tooBig = picked.find(
-      (file) =>
-        file.size >
-        MAX_FILE_MB * 1024 * 1024
-    );
+    const tooBig =
+      picked.find(
+        (file) =>
+          file.size >
+          MAX_FILE_MB *
+            1024 *
+            1024
+      );
 
     if (tooBig) {
       setError(
         `Każde zdjęcie może mieć maksymalnie ${MAX_FILE_MB} MB.`
       );
+
       e.target.value = '';
+
       return;
     }
 
@@ -160,7 +239,10 @@ export default function Page() {
 
   async function addTask() {
     if (!title.trim()) {
-      setError('Wpisz tytuł zadania.');
+      setError(
+        'Wpisz tytuł zadania.'
+      );
+
       return;
     }
 
@@ -173,39 +255,60 @@ export default function Page() {
 
       for (const file of files) {
         const data =
-          await fileToDataUrl(file);
+          await fileToDataUrl(
+            file
+          );
 
         preparedFiles.push({
           name: file.name,
+
           type:
             file.type ||
             'image/jpeg',
+
           data,
         });
       }
 
-      const data = await api(
-        'create',
-        {
-          title: title.trim(),
-          description:
-            description.trim(),
-          files: preparedFiles,
-        }
-      );
+      const data =
+        await api(
+          'create',
+          {
+            title:
+              title.trim(),
+
+            description:
+              description.trim(),
+
+            files:
+              preparedFiles,
+
+            assigned_to_email:
+              assignee,
+          }
+        );
 
       setTitle('');
       setDescription('');
       setFiles([]);
+
       setShowForm(false);
 
-      if (data.email_sent) {
+      if (data.email_skipped) {
         setMessage(
-          'Zadanie dodane. Mail do biura został wysłany.'
+          'Zadanie dodane. To zadanie własne — bez powiadomienia e-mail.'
+        );
+      } else if (
+        data.email_sent
+      ) {
+        setMessage(
+          `Zadanie dodane. Powiadomienie wysłane do: ${personLabel(
+            assignee
+          )}.`
         );
       } else {
         setMessage(
-          'Zadanie dodane. Mail nie został wysłany — sprawdzimy Resend.'
+          'Zadanie dodane, ale mail nie został wysłany.'
         );
       }
 
@@ -224,20 +327,25 @@ export default function Page() {
     let note = null;
 
     if (status === 'done') {
-      note = window.prompt(
-        'Uwagi po wykonaniu zadania — opcjonalnie:',
-        ''
-      );
+      note =
+        window.prompt(
+          'Uwagi po wykonaniu zadania — opcjonalnie:',
+          ''
+        );
 
-      if (note === null) return;
+      if (note === null)
+        return;
     }
 
     try {
-      await api('status', {
-        id,
-        status,
-        note,
-      });
+      await api(
+        'status',
+        {
+          id,
+          status,
+          note,
+        }
+      );
 
       await loadTasks();
     } catch (e) {
@@ -260,15 +368,19 @@ export default function Page() {
     return (
       <main className="w">
         <div className="card login">
+
           <div className="ey">
             DARIA BARBARA
           </div>
 
-          <h1>Zadania biura</h1>
+          <h1>
+            Zadania biura
+          </h1>
 
           <p className="mut">
-            Zaloguj się adresem e-mail i
-            kodem dostępu.
+            Zaloguj się adresem
+            e-mail i kodem
+            dostępu.
           </p>
 
           <input
@@ -276,7 +388,9 @@ export default function Page() {
             placeholder="adres e-mail"
             value={email}
             onChange={(e) =>
-              setEmail(e.target.value)
+              setEmail(
+                e.target.value
+              )
             }
           />
 
@@ -286,7 +400,9 @@ export default function Page() {
             placeholder="kod dostępu"
             value={code}
             onChange={(e) =>
-              setCode(e.target.value)
+              setCode(
+                e.target.value
+              )
             }
           />
 
@@ -313,7 +429,10 @@ export default function Page() {
   const tabs = [
     ['all', 'Wszystkie'],
     ['todo', 'Do zrobienia'],
-    ['in_progress', 'W trakcie'],
+    [
+      'in_progress',
+      'W trakcie',
+    ],
     ['done', 'Zrobione'],
   ];
 
@@ -322,32 +441,39 @@ export default function Page() {
       ? tasks
       : tasks.filter(
           (task) =>
-            task.status === filter
+            task.status ===
+            filter
         );
 
   return (
     <main className="w">
+
       <div className="top">
+
         <div>
           <div className="ey">
             DARIA BARBARA
           </div>
 
-          <h1>Zadania biura</h1>
+          <h1>
+            Zadania biura
+          </h1>
 
           <div className="mut">
-            {me.email ===
-            'dariabarbarabartos@gmail.com'
-              ? 'Daria · Szefowa'
-              : 'Biuro'}
+            {personLabel(
+              me.email
+            )}
           </div>
         </div>
 
         <div className="row">
+
           <button
             className="lite"
             onClick={() =>
-              setShowForm(!showForm)
+              setShowForm(
+                !showForm
+              )
             }
           >
             + Nowe zadanie
@@ -359,6 +485,7 @@ export default function Page() {
           >
             Wyloguj
           </button>
+
         </div>
       </div>
 
@@ -376,11 +503,14 @@ export default function Page() {
 
       {showForm && (
         <div className="form">
+
           <input
             placeholder="Tytuł zadania"
             value={title}
             onChange={(e) =>
-              setTitle(e.target.value)
+              setTitle(
+                e.target.value
+              )
             }
           />
 
@@ -396,9 +526,60 @@ export default function Page() {
 
           <div
             style={{
-              margin: '10px 0 14px',
+              margin:
+                '10px 0 14px',
             }}
           >
+
+            <div
+              className="mut"
+              style={{
+                marginBottom: 6,
+              }}
+            >
+              Adresat zadania
+            </div>
+
+            <select
+              value={assignee}
+              onChange={(e) =>
+                setAssignee(
+                  e.target.value
+                )
+              }
+              style={{
+                width: '100%',
+                padding: 12,
+                borderRadius: 10,
+                border:
+                  '1px solid #ddd',
+                background:
+                  'white',
+              }}
+            >
+
+              <option
+                value={OFFICE}
+              >
+                Biuro
+              </option>
+
+              <option
+                value={BOSS}
+              >
+                Daria · Szefowa
+              </option>
+
+            </select>
+          </div>
+
+          <div
+            style={{
+              margin:
+                '10px 0 14px',
+            }}
+          >
+
             <label
               className="lite"
               style={{
@@ -411,6 +592,7 @@ export default function Page() {
                 fontWeight: 650,
               }}
             >
+
               📷 Dodaj zdjęcia
 
               <input
@@ -421,9 +603,11 @@ export default function Page() {
                   chooseFiles
                 }
                 style={{
-                  display: 'none',
+                  display:
+                    'none',
                 }}
               />
+
             </label>
 
             <span
@@ -432,23 +616,32 @@ export default function Page() {
                 marginLeft: 10,
               }}
             >
-              max {MAX_FILES} zdjęcia,{' '}
-              {MAX_FILE_MB} MB każde
+              max {MAX_FILES}{' '}
+              zdjęcia,{' '}
+              {MAX_FILE_MB} MB
+              każde
             </span>
           </div>
 
-          {files.length > 0 && (
+          {files.length >
+            0 && (
             <div
               className="mut"
               style={{
                 marginBottom: 12,
               }}
             >
-              {files.map((file) => (
-                <div key={file.name}>
-                  • {file.name}
-                </div>
-              ))}
+
+              {files.map(
+                (file, i) => (
+                  <div
+                    key={i}
+                  >
+                    • {file.name}
+                  </div>
+                )
+              )}
+
             </div>
           )}
 
@@ -460,12 +653,15 @@ export default function Page() {
               ? 'Dodaję…'
               : 'Dodaj zadanie'}
           </button>
+
         </div>
       )}
 
       <div className="tabs">
+
         {tabs.map(
           ([key, label]) => {
+
             const count =
               key === 'all'
                 ? tasks.length
@@ -484,14 +680,18 @@ export default function Page() {
                     : ''
                 }
                 onClick={() =>
-                  setFilter(key)
+                  setFilter(
+                    key
+                  )
                 }
               >
-                {label} {count}
+                {label}{' '}
+                {count}
               </button>
             );
           }
         )}
+
       </div>
 
       {filteredTasks.length ===
@@ -499,11 +699,13 @@ export default function Page() {
         <div
           className="mut"
           style={{
-            textAlign: 'center',
+            textAlign:
+              'center',
             padding: 40,
           }}
         >
-          Brak zadań w tej sekcji.
+          Brak zadań w tej
+          sekcji.
         </div>
       )}
 
@@ -513,7 +715,9 @@ export default function Page() {
             className="card"
             key={task.id}
           >
+
             <div className="bot">
+
               <span
                 className={
                   'st ' +
@@ -526,6 +730,7 @@ export default function Page() {
                     : '')
                 }
               >
+
                 {task.status ===
                 'todo'
                   ? 'Do zrobienia'
@@ -533,22 +738,30 @@ export default function Page() {
                     'in_progress'
                   ? 'W trakcie'
                   : 'Zrobione'}
+
               </span>
 
               <span className="mut">
+
                 {new Date(
                   task.created_at
                 ).toLocaleString(
                   'pl-PL'
                 )}
+
               </span>
+
             </div>
 
-            <h2>{task.title}</h2>
+            <h2>
+              {task.title}
+            </h2>
 
             {task.description && (
               <p>
-                {task.description}
+                {
+                  task.description
+                }
               </p>
             )}
 
@@ -559,15 +772,24 @@ export default function Page() {
                 .length > 0 && (
                 <div
                   style={{
-                    display: 'grid',
+                    display:
+                      'grid',
+
                     gridTemplateColumns:
                       'repeat(auto-fill,minmax(120px,1fr))',
+
                     gap: 10,
-                    margin: '14px 0',
+
+                    margin:
+                      '14px 0',
                   }}
                 >
+
                   {task.attachments.map(
-                    (attachment, i) =>
+                    (
+                      attachment,
+                      i
+                    ) =>
                       attachment.url ? (
                         <a
                           href={
@@ -602,12 +824,15 @@ export default function Page() {
                         </a>
                       ) : null
                   )}
+
                 </div>
               )}
 
             {task.completion_note && (
               <div className="note">
-                <b>Uwagi:</b>{' '}
+                <b>
+                  Uwagi:
+                </b>{' '}
                 {
                   task.completion_note
                 }
@@ -615,12 +840,16 @@ export default function Page() {
             )}
 
             <div className="bot">
+
               <span className="mut">
-                {task.assigned_to_email ||
-                  'Biuro'}
+                Dla:{' '}
+                {personLabel(
+                  task.assigned_to_email
+                )}
               </span>
 
               <div className="row">
+
                 {task.status ===
                   'todo' && (
                   <button
@@ -637,6 +866,7 @@ export default function Page() {
 
                 {task.status !==
                 'done' ? (
+
                   <button
                     onClick={() =>
                       changeStatus(
@@ -647,7 +877,9 @@ export default function Page() {
                   >
                     ✓ Zrobione
                   </button>
+
                 ) : (
+
                   <button
                     className="lite"
                     onClick={() =>
@@ -659,12 +891,16 @@ export default function Page() {
                   >
                     Przywróć
                   </button>
+
                 )}
+
               </div>
             </div>
+
           </div>
         )
       )}
+
     </main>
   );
 }
