@@ -8,75 +8,48 @@ const API =
 const BOSS = 'dariabarbarabartos@gmail.com';
 const OFFICE = 'biurodariabarbara@gmail.com';
 
-const ALLOWED = [BOSS, OFFICE];
-
 const MAX_FILES = 3;
 const MAX_FILE_MB = 5;
 
 function personLabel(email) {
-  return email === BOSS
-    ? 'Daria · Szefowa'
-    : 'Biuro';
+  if (email === BOSS) return 'Szefowa';
+  if (email === OFFICE) return 'Biuro';
+  return email || 'Biuro';
 }
 
 export default function Page() {
-  const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
   const [me, setMe] = useState(null);
 
   const [tasks, setTasks] = useState([]);
   const [filter, setFilter] = useState('all');
 
-  const [showForm, setShowForm] =
-    useState(false);
-
+  const [showForm, setShowForm] = useState(false);
   const [title, setTitle] = useState('');
-  const [description, setDescription] =
-    useState('');
-
+  const [description, setDescription] = useState('');
   const [files, setFiles] = useState([]);
+  const [assignee, setAssignee] = useState(OFFICE);
 
-  const [assignee, setAssignee] =
-    useState(OFFICE);
-
-  const [saving, setSaving] =
-    useState(false);
-
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const [message, setMessage] =
-    useState('');
+  const [message, setMessage] = useState('');
 
-  async function api(
-    action,
-    extra = {},
-    auth = me
-  ) {
-    const credentials =
-      auth || {
-        email: email
-          .toLowerCase()
-          .trim(),
-        code,
-      };
+  async function api(action, extra = {}, auth = me) {
+    const credentials = auth || { code };
 
     const response = await fetch(API, {
       method: 'POST',
-
       headers: {
-        'Content-Type':
-          'application/json',
+        'Content-Type': 'application/json',
       },
-
       body: JSON.stringify({
         action,
-        email: credentials.email,
         code: credentials.code,
         ...extra,
       }),
     });
 
-    const data =
-      await response.json();
+    const data = await response.json();
 
     if (!response.ok) {
       throw new Error(
@@ -89,160 +62,143 @@ export default function Page() {
     return data;
   }
 
-  async function loadTasks(
-    auth = me
-  ) {
+  async function loadTasks(auth = me) {
     try {
-      const data = await api(
-        'list',
-        {},
-        auth
-      );
+      const data = await api('list', {}, auth);
+      setTasks(data.tasks || []);
 
-      setTasks(
-        data.tasks || []
-      );
+      return data;
     } catch (e) {
       setError(e.message);
+      throw e;
     }
   }
 
   useEffect(() => {
     try {
-      const saved =
-        JSON.parse(
-          localStorage.getItem(
-            'office_auth'
-          )
-        );
+      const saved = JSON.parse(
+        localStorage.getItem('office_auth')
+      );
 
-      if (
-        saved?.email &&
-        saved?.code
-      ) {
-        setMe(saved);
+      if (saved?.code) {
+        loadTasks(saved)
+          .then((data) => {
+            const loggedUser = {
+              code: saved.code,
+              email: data.me?.email,
+            };
 
-        setAssignee(
-          saved.email === OFFICE
-            ? OFFICE
-            : OFFICE
-        );
+            setMe(loggedUser);
 
-        loadTasks(saved);
+            setAssignee(
+              data.me?.email === OFFICE
+                ? OFFICE
+                : OFFICE
+            );
+
+            localStorage.setItem(
+              'office_auth',
+              JSON.stringify(loggedUser)
+            );
+          })
+          .catch(() => {
+            localStorage.removeItem('office_auth');
+          });
       }
     } catch {}
   }, []);
 
   async function login() {
     setError('');
+    setMessage('');
 
-    const normalizedEmail =
-      email
-        .toLowerCase()
-        .trim();
-
-    if (
-      !ALLOWED.includes(
-        normalizedEmail
-      )
-    ) {
-      setError(
-        'Ten adres e-mail nie ma dostępu.'
-      );
-
+    if (!code.trim()) {
+      setError('Wpisz kod dostępu.');
       return;
     }
 
     const auth = {
-      email: normalizedEmail,
-      code,
+      code: code.trim(),
     };
 
     try {
-      const data = await api(
-        'list',
-        {},
-        auth
-      );
+      const data = await api('list', {}, auth);
+
+      const loggedUser = {
+        code: auth.code,
+        email: data.me?.email,
+      };
 
       localStorage.setItem(
         'office_auth',
-        JSON.stringify(auth)
+        JSON.stringify(loggedUser)
       );
 
-      setMe(auth);
+      setMe(loggedUser);
+      setTasks(data.tasks || []);
 
       setAssignee(
-        normalizedEmail === OFFICE
+        data.me?.email === OFFICE
           ? OFFICE
           : OFFICE
       );
 
-      setTasks(
-        data.tasks || []
-      );
+      setCode('');
     } catch (e) {
       setError(e.message);
     }
   }
 
   function fileToDataUrl(file) {
-    return new Promise(
-      (resolve, reject) => {
-        const reader =
-          new FileReader();
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
 
-        reader.onload = () =>
-          resolve(
-            reader.result
-          );
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
 
-        reader.onerror =
-          reject;
-
-        reader.readAsDataURL(
-          file
-        );
-      }
-    );
+      reader.readAsDataURL(file);
+    });
   }
 
   function chooseFiles(e) {
     setError('');
 
-    const picked =
-      Array.from(
-        e.target.files || []
-      ).slice(0, MAX_FILES);
+    const allFiles = Array.from(e.target.files || []);
 
-    const tooBig =
-      picked.find(
-        (file) =>
-          file.size >
-          MAX_FILE_MB *
-            1024 *
-            1024
+    if (allFiles.length > MAX_FILES) {
+      setError(
+        `Możesz dodać maksymalnie ${MAX_FILES} zdjęcia.`
       );
+      e.target.value = '';
+      return;
+    }
+
+    const tooBig = allFiles.find(
+      (file) =>
+        file.size >
+        MAX_FILE_MB * 1024 * 1024
+    );
 
     if (tooBig) {
       setError(
         `Każde zdjęcie może mieć maksymalnie ${MAX_FILE_MB} MB.`
       );
-
       e.target.value = '';
-
       return;
     }
 
-    setFiles(picked);
+    setFiles(allFiles);
+  }
+
+  function removeFile(index) {
+    setFiles((current) =>
+      current.filter((_, i) => i !== index)
+    );
   }
 
   async function addTask() {
     if (!title.trim()) {
-      setError(
-        'Wpisz tytuł zadania.'
-      );
-
+      setError('Wpisz tytuł zadania.');
       return;
     }
 
@@ -254,53 +210,32 @@ export default function Page() {
       const preparedFiles = [];
 
       for (const file of files) {
-        const data =
-          await fileToDataUrl(
-            file
-          );
+        const data = await fileToDataUrl(file);
 
         preparedFiles.push({
           name: file.name,
-
-          type:
-            file.type ||
-            'image/jpeg',
-
+          type: file.type || 'image/jpeg',
           data,
         });
       }
 
-      const data =
-        await api(
-          'create',
-          {
-            title:
-              title.trim(),
-
-            description:
-              description.trim(),
-
-            files:
-              preparedFiles,
-
-            assigned_to_email:
-              assignee,
-          }
-        );
+      const data = await api('create', {
+        title: title.trim(),
+        description: description.trim(),
+        files: preparedFiles,
+        assigned_to_email: assignee,
+      });
 
       setTitle('');
       setDescription('');
       setFiles([]);
-
       setShowForm(false);
 
       if (data.email_skipped) {
         setMessage(
-          'Zadanie dodane. To zadanie własne — bez powiadomienia e-mail.'
+          'Zadanie dodane. Zadanie własne — bez powiadomienia e-mail.'
         );
-      } else if (
-        data.email_sent
-      ) {
+      } else if (data.email_sent) {
         setMessage(
           `Zadanie dodane. Powiadomienie wysłane do: ${personLabel(
             assignee
@@ -308,7 +243,7 @@ export default function Page() {
         );
       } else {
         setMessage(
-          'Zadanie dodane, ale mail nie został wysłany.'
+          'Zadanie dodane, ale powiadomienie e-mail nie zostało wysłane.'
         );
       }
 
@@ -320,32 +255,26 @@ export default function Page() {
     }
   }
 
-  async function changeStatus(
-    id,
-    status
-  ) {
+  async function changeStatus(id, status) {
     let note = null;
 
     if (status === 'done') {
-      note =
-        window.prompt(
-          'Uwagi po wykonaniu zadania — opcjonalnie:',
-          ''
-        );
+      note = window.prompt(
+        'Uwagi po wykonaniu zadania — opcjonalnie:',
+        ''
+      );
 
-      if (note === null)
-        return;
+      if (note === null) return;
     }
 
     try {
-      await api(
-        'status',
-        {
-          id,
-          status,
-          note,
-        }
-      );
+      setError('');
+
+      await api('status', {
+        id,
+        status,
+        note,
+      });
 
       await loadTasks();
     } catch (e) {
@@ -354,56 +283,40 @@ export default function Page() {
   }
 
   function logout() {
-    localStorage.removeItem(
-      'office_auth'
-    );
+    localStorage.removeItem('office_auth');
 
     setMe(null);
     setTasks([]);
-    setEmail('');
     setCode('');
+    setMessage('');
+    setError('');
   }
 
   if (!me) {
     return (
       <main className="w">
         <div className="card login">
-
           <div className="ey">
             DARIA BARBARA
           </div>
 
-          <h1>
-            Zadania biura
-          </h1>
+          <h1>Zadania biura</h1>
 
           <p className="mut">
-            Zaloguj się adresem
-            e-mail i kodem
-            dostępu.
+            Wpisz swój kod dostępu.
           </p>
-
-          <input
-            type="email"
-            placeholder="adres e-mail"
-            value={email}
-            onChange={(e) =>
-              setEmail(
-                e.target.value
-              )
-            }
-          />
 
           <input
             type="password"
             inputMode="numeric"
-            placeholder="kod dostępu"
+            placeholder="Kod dostępu"
             value={code}
             onChange={(e) =>
-              setCode(
-                e.target.value
-              )
+              setCode(e.target.value)
             }
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') login();
+            }}
           />
 
           <button
@@ -429,10 +342,7 @@ export default function Page() {
   const tabs = [
     ['all', 'Wszystkie'],
     ['todo', 'Do zrobienia'],
-    [
-      'in_progress',
-      'W trakcie',
-    ],
+    ['in_progress', 'W trakcie'],
     ['done', 'Zrobione'],
   ];
 
@@ -440,40 +350,29 @@ export default function Page() {
     filter === 'all'
       ? tasks
       : tasks.filter(
-          (task) =>
-            task.status ===
-            filter
+          (task) => task.status === filter
         );
 
   return (
     <main className="w">
-
       <div className="top">
-
         <div>
           <div className="ey">
             DARIA BARBARA
           </div>
 
-          <h1>
-            Zadania biura
-          </h1>
+          <h1>Zadania biura</h1>
 
           <div className="mut">
-            {personLabel(
-              me.email
-            )}
+            Zalogowano: {personLabel(me.email)}
           </div>
         </div>
 
         <div className="row">
-
           <button
             className="lite"
             onClick={() =>
-              setShowForm(
-                !showForm
-              )
+              setShowForm(!showForm)
             }
           >
             + Nowe zadanie
@@ -485,7 +384,6 @@ export default function Page() {
           >
             Wyloguj
           </button>
-
         </div>
       </div>
 
@@ -503,14 +401,11 @@ export default function Page() {
 
       {showForm && (
         <div className="form">
-
           <input
             placeholder="Tytuł zadania"
             value={title}
             onChange={(e) =>
-              setTitle(
-                e.target.value
-              )
+              setTitle(e.target.value)
             }
           />
 
@@ -518,96 +413,74 @@ export default function Page() {
             placeholder="Opis / szczegóły"
             value={description}
             onChange={(e) =>
-              setDescription(
-                e.target.value
-              )
+              setDescription(e.target.value)
             }
           />
 
           <div
             style={{
-              margin:
-                '10px 0 14px',
+              margin: '10px 0 14px',
             }}
           >
-
             <div
               className="mut"
               style={{
                 marginBottom: 6,
               }}
             >
-              Adresat zadania
+              Dla kogo jest zadanie?
             </div>
 
             <select
               value={assignee}
               onChange={(e) =>
-                setAssignee(
-                  e.target.value
-                )
+                setAssignee(e.target.value)
               }
               style={{
                 width: '100%',
-                padding: 12,
+                padding: '12px 14px',
                 borderRadius: 10,
-                border:
-                  '1px solid #ddd',
-                background:
-                  'white',
+                border: '1px solid #ddd',
+                background: '#fff',
+                fontSize: 15,
               }}
             >
-
-              <option
-                value={OFFICE}
-              >
+              <option value={OFFICE}>
                 Biuro
               </option>
 
-              <option
-                value={BOSS}
-              >
-                Daria · Szefowa
+              <option value={BOSS}>
+                Szefowa
               </option>
-
             </select>
           </div>
 
           <div
             style={{
-              margin:
-                '10px 0 14px',
+              margin: '10px 0 14px',
             }}
           >
-
             <label
               className="lite"
               style={{
-                display:
-                  'inline-block',
-                padding:
-                  '11px 16px',
+                display: 'inline-block',
+                padding: '11px 16px',
                 borderRadius: 999,
                 cursor: 'pointer',
                 fontWeight: 650,
               }}
             >
-
               📷 Dodaj zdjęcia
 
               <input
                 type="file"
                 accept="image/*"
                 multiple
-                onChange={
-                  chooseFiles
-                }
+                onChange={chooseFiles}
                 style={{
-                  display:
-                    'none',
+                  display: 'none',
                 }}
               />
-
             </label>
 
             <span
@@ -616,32 +489,48 @@ export default function Page() {
                 marginLeft: 10,
               }}
             >
-              max {MAX_FILES}{' '}
-              zdjęcia,{' '}
-              {MAX_FILE_MB} MB
-              każde
+              max {MAX_FILES} zdjęcia,{' '}
+              {MAX_FILE_MB} MB każde
             </span>
           </div>
 
-          {files.length >
-            0 && (
+          {files.length > 0 && (
             <div
-              className="mut"
               style={{
-                marginBottom: 12,
+                marginBottom: 14,
               }}
             >
-
-              {files.map(
-                (file, i) => (
-                  <div
-                    key={i}
-                  >
+              {files.map((file, index) => (
+                <div
+                  key={`${file.name}-${index}`}
+                  className="mut"
+                  style={{
+                    display: 'flex',
+                    justifyContent:
+                      'space-between',
+                    alignItems: 'center',
+                    gap: 10,
+                    marginBottom: 6,
+                  }}
+                >
+                  <span>
                     • {file.name}
-                  </div>
-                )
-              )}
+                  </span>
 
+                  <button
+                    type="button"
+                    className="lite"
+                    onClick={() =>
+                      removeFile(index)
+                    }
+                    style={{
+                      padding: '5px 10px',
+                    }}
+                  >
+                    Usuń
+                  </button>
+                </div>
+              ))}
             </div>
           )}
 
@@ -653,254 +542,193 @@ export default function Page() {
               ? 'Dodaję…'
               : 'Dodaj zadanie'}
           </button>
-
         </div>
       )}
 
       <div className="tabs">
+        {tabs.map(([key, label]) => {
+          const count =
+            key === 'all'
+              ? tasks.length
+              : tasks.filter(
+                  (task) =>
+                    task.status === key
+                ).length;
 
-        {tabs.map(
-          ([key, label]) => {
-
-            const count =
-              key === 'all'
-                ? tasks.length
-                : tasks.filter(
-                    (task) =>
-                      task.status ===
-                      key
-                  ).length;
-
-            return (
-              <button
-                key={key}
-                className={
-                  filter === key
-                    ? 'on'
-                    : ''
-                }
-                onClick={() =>
-                  setFilter(
-                    key
-                  )
-                }
-              >
-                {label}{' '}
-                {count}
-              </button>
-            );
-          }
-        )}
-
+          return (
+            <button
+              key={key}
+              className={
+                filter === key ? 'on' : ''
+              }
+              onClick={() =>
+                setFilter(key)
+              }
+            >
+              {label} {count}
+            </button>
+          );
+        })}
       </div>
 
-      {filteredTasks.length ===
-        0 && (
+      {filteredTasks.length === 0 && (
         <div
           className="mut"
           style={{
-            textAlign:
-              'center',
+            textAlign: 'center',
             padding: 40,
           }}
         >
-          Brak zadań w tej
-          sekcji.
+          Brak zadań w tej sekcji.
         </div>
       )}
 
-      {filteredTasks.map(
-        (task) => (
-          <div
-            className="card"
-            key={task.id}
-          >
-
-            <div className="bot">
-
-              <span
-                className={
-                  'st ' +
-                  (task.status ===
-                  'done'
-                    ? 'done'
-                    : task.status ===
-                      'in_progress'
-                    ? 'prog'
-                    : '')
-                }
-              >
-
-                {task.status ===
-                'todo'
-                  ? 'Do zrobienia'
+      {filteredTasks.map((task) => (
+        <div
+          className="card"
+          key={task.id}
+        >
+          <div className="bot">
+            <span
+              className={
+                'st ' +
+                (task.status === 'done'
+                  ? 'done'
                   : task.status ===
                     'in_progress'
-                  ? 'W trakcie'
-                  : 'Zrobione'}
+                  ? 'prog'
+                  : '')
+              }
+            >
+              {task.status === 'todo'
+                ? 'Do zrobienia'
+                : task.status ===
+                  'in_progress'
+                ? 'W trakcie'
+                : 'Zrobione'}
+            </span>
 
-              </span>
+            <span className="mut">
+              {new Date(
+                task.created_at
+              ).toLocaleString('pl-PL')}
+            </span>
+          </div>
 
-              <span className="mut">
+          <h2>{task.title}</h2>
 
-                {new Date(
-                  task.created_at
-                ).toLocaleString(
-                  'pl-PL'
-                )}
+          {task.description && (
+            <p>{task.description}</p>
+          )}
 
-              </span>
-
-            </div>
-
-            <h2>
-              {task.title}
-            </h2>
-
-            {task.description && (
-              <p>
-                {
-                  task.description
-                }
-              </p>
-            )}
-
-            {Array.isArray(
-              task.attachments
-            ) &&
-              task.attachments
-                .length > 0 && (
-                <div
-                  style={{
-                    display:
-                      'grid',
-
-                    gridTemplateColumns:
-                      'repeat(auto-fill,minmax(120px,1fr))',
-
-                    gap: 10,
-
-                    margin:
-                      '14px 0',
-                  }}
-                >
-
-                  {task.attachments.map(
-                    (
-                      attachment,
-                      i
-                    ) =>
-                      attachment.url ? (
-                        <a
-                          href={
+          {Array.isArray(
+            task.attachments
+          ) &&
+            task.attachments.length > 0 && (
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns:
+                    'repeat(auto-fill,minmax(120px,1fr))',
+                  gap: 10,
+                  margin: '14px 0',
+                }}
+              >
+                {task.attachments.map(
+                  (attachment, i) =>
+                    attachment.url ? (
+                      <a
+                        href={
+                          attachment.url
+                        }
+                        target="_blank"
+                        rel="noreferrer"
+                        key={
+                          attachment.path || i
+                        }
+                      >
+                        <img
+                          src={
                             attachment.url
                           }
-                          target="_blank"
-                          rel="noreferrer"
-                          key={
-                            attachment.path ||
-                            i
+                          alt={
+                            attachment.name ||
+                            'Załącznik'
                           }
-                        >
-                          <img
-                            src={
-                              attachment.url
-                            }
-                            alt={
-                              attachment.name ||
-                              'Załącznik'
-                            }
-                            style={{
-                              width:
-                                '100%',
-                              height: 120,
-                              objectFit:
-                                'cover',
-                              borderRadius: 12,
-                              border:
-                                '1px solid #e4ded5',
-                            }}
-                          />
-                        </a>
-                      ) : null
-                  )}
-
-                </div>
-              )}
-
-            {task.completion_note && (
-              <div className="note">
-                <b>
-                  Uwagi:
-                </b>{' '}
-                {
-                  task.completion_note
-                }
+                          style={{
+                            width: '100%',
+                            height: 120,
+                            objectFit: 'cover',
+                            borderRadius: 12,
+                            border:
+                              '1px solid #e4ded5',
+                          }}
+                        />
+                      </a>
+                    ) : null
+                )}
               </div>
             )}
 
-            <div className="bot">
+          {task.completion_note && (
+            <div className="note">
+              <b>Uwagi:</b>{' '}
+              {task.completion_note}
+            </div>
+          )}
 
-              <span className="mut">
-                Dla:{' '}
+          <div className="bot">
+            <span className="mut">
+              Dla:{' '}
+              <b>
                 {personLabel(
                   task.assigned_to_email
                 )}
-              </span>
+              </b>
+            </span>
 
-              <div className="row">
+            <div className="row">
+              {task.status === 'todo' && (
+                <button
+                  onClick={() =>
+                    changeStatus(
+                      task.id,
+                      'in_progress'
+                    )
+                  }
+                >
+                  Rozpocznij
+                </button>
+              )}
 
-                {task.status ===
-                  'todo' && (
-                  <button
-                    onClick={() =>
-                      changeStatus(
-                        task.id,
-                        'in_progress'
-                      )
-                    }
-                  >
-                    Rozpocznij
-                  </button>
-                )}
-
-                {task.status !==
-                'done' ? (
-
-                  <button
-                    onClick={() =>
-                      changeStatus(
-                        task.id,
-                        'done'
-                      )
-                    }
-                  >
-                    ✓ Zrobione
-                  </button>
-
-                ) : (
-
-                  <button
-                    className="lite"
-                    onClick={() =>
-                      changeStatus(
-                        task.id,
-                        'todo'
-                      )
-                    }
-                  >
-                    Przywróć
-                  </button>
-
-                )}
-
-              </div>
+              {task.status !== 'done' ? (
+                <button
+                  onClick={() =>
+                    changeStatus(
+                      task.id,
+                      'done'
+                    )
+                  }
+                >
+                  ✓ Zrobione
+                </button>
+              ) : (
+                <button
+                  className="lite"
+                  onClick={() =>
+                    changeStatus(
+                      task.id,
+                      'todo'
+                    )
+                  }
+                >
+                  Przywróć
+                </button>
+              )}
             </div>
-
           </div>
-        )
-      )}
-
+        </div>
+      ))}
     </main>
   );
 }
