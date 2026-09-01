@@ -7,6 +7,7 @@ const API =
 
 const BOSS = 'dariabarbarabartos@gmail.com';
 const OFFICE = 'biurodariabarbara@gmail.com';
+const MARCIN = 'biuro.tanielaptopy@gmail.com';
 
 const MAX_FILES = 3;
 const MAX_FILE_MB = 5;
@@ -14,6 +15,7 @@ const MAX_FILE_MB = 5;
 function personLabel(email) {
   if (email === BOSS) return 'Szefowa';
   if (email === OFFICE) return 'Biuro';
+  if (email === MARCIN) return 'Marcin';
   return email || 'Biuro';
 }
 
@@ -28,6 +30,9 @@ export default function Page() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [files, setFiles] = useState([]);
+
+  // Domyślnie każde nowe zadanie kierujemy do Biura.
+  // Dotyczy to również Marcina.
   const [assignee, setAssignee] = useState(OFFICE);
 
   const [saving, setSaving] = useState(false);
@@ -65,6 +70,7 @@ export default function Page() {
   async function loadTasks(auth = me) {
     try {
       const data = await api('list', {}, auth);
+
       setTasks(data.tasks || []);
 
       return data;
@@ -90,11 +96,9 @@ export default function Page() {
 
             setMe(loggedUser);
 
-            setAssignee(
-              data.me?.email === OFFICE
-                ? OFFICE
-                : OFFICE
-            );
+            // Po wejściu do aplikacji:
+            // domyślny adresat = Biuro.
+            setAssignee(OFFICE);
 
             localStorage.setItem(
               'office_auth',
@@ -137,11 +141,8 @@ export default function Page() {
       setMe(loggedUser);
       setTasks(data.tasks || []);
 
-      setAssignee(
-        data.me?.email === OFFICE
-          ? OFFICE
-          : OFFICE
-      );
+      // Również Marcin ma domyślnie Biuro.
+      setAssignee(OFFICE);
 
       setCode('');
     } catch (e) {
@@ -169,6 +170,7 @@ export default function Page() {
       setError(
         `Możesz dodać maksymalnie ${MAX_FILES} zdjęcia.`
       );
+
       e.target.value = '';
       return;
     }
@@ -183,6 +185,7 @@ export default function Page() {
       setError(
         `Każde zdjęcie może mieć maksymalnie ${MAX_FILE_MB} MB.`
       );
+
       e.target.value = '';
       return;
     }
@@ -230,6 +233,10 @@ export default function Page() {
       setDescription('');
       setFiles([]);
       setShowForm(false);
+
+      // Po dodaniu kolejnego zadania
+      // znowu domyślnie ustawiamy Biuro.
+      setAssignee(OFFICE);
 
       if (data.email_skipped) {
         setMessage(
@@ -290,6 +297,7 @@ export default function Page() {
     setCode('');
     setMessage('');
     setError('');
+    setAssignee(OFFICE);
   }
 
   if (!me) {
@@ -371,9 +379,13 @@ export default function Page() {
         <div className="row">
           <button
             className="lite"
-            onClick={() =>
-              setShowForm(!showForm)
-            }
+            onClick={() => {
+              setShowForm(!showForm);
+
+              if (!showForm) {
+                setAssignee(OFFICE);
+              }
+            }}
           >
             + Nowe zadanie
           </button>
@@ -451,6 +463,10 @@ export default function Page() {
 
               <option value={BOSS}>
                 Szefowa
+              </option>
+
+              <option value={MARCIN}>
+                Marcin
               </option>
             </select>
           </div>
@@ -621,9 +637,7 @@ export default function Page() {
             <p>{task.description}</p>
           )}
 
-          {Array.isArray(
-            task.attachments
-          ) &&
+          {Array.isArray(task.attachments) &&
             task.attachments.length > 0 && (
               <div
                 style={{
@@ -638,9 +652,7 @@ export default function Page() {
                   (attachment, i) =>
                     attachment.url ? (
                       <a
-                        href={
-                          attachment.url
-                        }
+                        href={attachment.url}
                         target="_blank"
                         rel="noreferrer"
                         key={
@@ -648,9 +660,7 @@ export default function Page() {
                         }
                       >
                         <img
-                          src={
-                            attachment.url
-                          }
+                          src={attachment.url}
                           alt={
                             attachment.name ||
                             'Załącznik'
